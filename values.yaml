@@ -4,90 +4,68 @@ expose:
   # in the corresponding section
   type: ingress
   tls:
-    # Enable the tls or not. Note: if the type is "ingress" and the tls 
-    # is disabled, the port must be included in the command when pull/push
-    # images. Refer to https://github.com/goharbor/harbor/issues/5291 
-    # for the detail.
-    enabled: true
+    # Set the type as "secretName", "custom CA", "rancher" or "self-signed x509 certificate"
+    type: secretName
     # Fill the name of secret if you want to use your own TLS certificate
     # and private key. The secret must contain keys named tls.crt and 
     # tls.key that contain the certificate and private key to use for TLS
-    # The certificate and private key will be generated automatically if 
-    # it is not set
     secretName: ""
-    # By default, the Notary service will use the same cert and key as
-    # described above. Fill the name of secret if you want to use a 
-    # separated one. Only needed when the type is "ingress".
-    notarySecretName: ""
-    # The commmon name used to generate the certificate, it's necessary
-    # when the type isn't "ingress" and "secretName" is null
-    commonName: ""
+    # Fill the caCertificate of tls.crt and caPrivateKey of tls.key if you
+    # want to create a new secret of your own TLS certificate.
+    # The certificate and private key will be generated automatically if
+    # both secretName and custom CA are not set of following domainCert and domainKey
+    domainCert: ""
+    domainKey: ""
   ingress:
-    hosts:
-      core: core.harbor.domain
-      notary: notary.harbor.domain
+    host: harbor.local
+    # set to the type of ingress controller if it has specific requirements.
+    # leave as `default` for most ingress controllers.
+    # set to `gce` if using the GCE ingress controller
+    controller: default
     annotations:
       ingress.kubernetes.io/ssl-redirect: "true"
-      nginx.ingress.kubernetes.io/ssl-redirect: "true"
       ingress.kubernetes.io/proxy-body-size: "0"
+      nginx.ingress.kubernetes.io/ssl-redirect: "true"
       nginx.ingress.kubernetes.io/proxy-body-size: "0"
+    # The annotation name for "rewrite-target", only needed when Notary
+    # service is enabled
+    rewriteAnnotation: nginx.ingress.kubernetes.io/rewrite-target
   clusterIP:
     # The name of ClusterIP service
     name: harbor
     ports:
-      # The service port Harbor listens on when serving with HTTP
-      httpPort: 80
       # The service port Harbor listens on when serving with HTTPS
-      httpsPort: 443
-      # The service port Notary listens on. Only needed when notary.enabled 
-      # is set to true
-      notaryPort: 4443
+      https: 443
   nodePort:
     # The name of NodePort service
     name: harbor
     ports:
-      http:
-        # The service port Harbor listens on when serving with HTTP
-        port: 80
-        # The node port Harbor listens on when serving with HTTP
-        nodePort: 30002
-      https: 
+      https:
         # The service port Harbor listens on when serving with HTTPS
         port: 443
         # The node port Harbor listens on when serving with HTTPS
         nodePort: 30003
-      # Only needed when notary.enabled is set to true
-      notary: 
-        # The service port Notary listens on
-        port: 4443
-        # The node port Notary listens on
-        nodePort: 30004
   loadBalancer:
     # The name of LoadBalancer service
     name: harbor
     ports:
-      # The service port Harbor listens on when serving with HTTP
-      httpPort: 80
       # The service port Harbor listens on when serving with HTTPS
-      httpsPort: 443
-      # The service port Notary listens on. Only needed when notary.enabled 
-      # is set to true
-      notaryPort: 4443
+      https: 443
 
-# The external URL for Harbor core service. It is used to
+# The external URL for Harbor service. It is used to
 # 1) populate the docker/helm commands showed on portal
 # 2) populate the token service URL returned to docker/notary client
 # 
 # Format: protocol://domain[:port]. Usually:
 # 1) if "expose.type" is "ingress", the "domain" should be 
-# the value of "expose.ingress.hosts.core"
+# the value of "expose.ingress.host"
 # 2) if "expose.type" is "clusterIP", the "domain" should be
 # the value of "expose.clusterIP.name"
 # 3) if "expose.type" is "nodePort", the "domain" should be
 # the IP address of k8s node 
 # 
 # If Harbor is deployed behind the proxy, set it as the URL of proxy
-externalURL: https://core.harbor.domain
+externalURL: https://harbor.local
 
 # The persistence is enabled by default and a default StorageClass
 # is needed in the k8s cluster to provision volumes dynamicly. 
@@ -97,11 +75,14 @@ externalURL: https://core.harbor.domain
 # For storing images and charts, you can also use "azure", "gcs", "s3", 
 # "swift" or "oss". Set it in the "imageChartStorage" section
 persistence:
-  enabled: true
-  # Setting it to "keep" to avoid removing PVCs during a helm delete 
+  #emptyDir/hostPath/storageClass
+  type: emptyDir
+  # Setting it to "keep" to avoid removing PVCs during a helm delete
   # operation. Leaving it empty will delete PVCs after the chart deleted
   resourcePolicy: "keep"
+  hostPath: /var/lib/harbor
   persistentVolumeClaim:
+    storageClass: ""
     registry:
       # Use the existing PVC which must be created manually before bound, 
       # and specify the "subPath" if the PVC is shared with other components
@@ -119,6 +100,7 @@ persistence:
       subPath: ""
       accessMode: ReadWriteOnce
       size: 5Gi
+    # update default jobservice jobLogger to DB so pvc is not really required
     jobservice:
       existingClaim: ""
       storageClass: ""
@@ -141,81 +123,81 @@ persistence:
       subPath: ""
       accessMode: ReadWriteOnce
       size: 1Gi
-  # Define which storage backend is used for registry and chartmuseum to store
-  # images and charts. Refer to 
-  # https://github.com/docker/distribution/blob/master/docs/configuration.md#storage 
+# Define which storage backend is used for registry and chartmuseum to store
+# images and charts. Refer to
+# https://github.com/docker/distribution/blob/master/docs/configuration.md#storage
+# for the detail.
+imageChartStorage:
+  # Specify whether to disable `redirect` for images and chart storage, for
+  # backends which not supported it (such as using minio for `s3` storage type), please disable
+  # it. To disable redirects, simply set `disableredirect` to `true` instead.
+  # Refer to
+  # https://github.com/docker/distribution/blob/master/docs/configuration.md#redirect
   # for the detail.
-  imageChartStorage:
-    # Specify whether to disable `redirect` for images and chart storage, for 
-    # backends which not supported it (such as using minio for `s3` storage type), please disable 
-    # it. To disable redirects, simply set `disableredirect` to `true` instead. 
-    # Refer to 
-    # https://github.com/docker/distribution/blob/master/docs/configuration.md#redirect  
-    # for the detail.
-    disableredirect: false
-    # Specify the type of storage: "filesystem", "azure", "gcs", "s3", "swift", 
-    # "oss" and fill the information needed in the corresponding section. The type
-    # must be "filesystem" if you want to use persistent volumes for registry
-    # and chartmuseum
-    type: filesystem
-    filesystem:
-      rootdirectory: /storage
-      #maxthreads: 100
-    azure:
-      accountname: accountname
-      accountkey: base64encodedaccountkey
-      container: containername
-      #realm: core.windows.net
-    gcs:
-      bucket: bucketname
-      # The base64 encoded json file which contains the key
-      encodedkey: base64-encoded-json-key-file
-      #rootdirectory: /gcs/object/name/prefix
-      #chunksize: "5242880"
-    s3:
-      region: us-west-1
-      bucket: bucketname
-      #accesskey: awsaccesskey
-      #secretkey: awssecretkey
-      #regionendpoint: http://myobjects.local
-      #encrypt: false
-      #keyid: mykeyid
-      #secure: true
-      #v4auth: true
-      #chunksize: "5242880"
-      #rootdirectory: /s3/object/name/prefix
-      #storageclass: STANDARD
-    swift:
-      authurl: https://storage.myprovider.com/v3/auth
-      username: username
-      password: password
-      container: containername
-      #region: fr
-      #tenant: tenantname
-      #tenantid: tenantid
-      #domain: domainname
-      #domainid: domainid
-      #trustid: trustid
-      #insecureskipverify: false
-      #chunksize: 5M
-      #prefix:
-      #secretkey: secretkey
-      #accesskey: accesskey
-      #authversion: 3
-      #endpointtype: public
-      #tempurlcontainerkey: false
-      #tempurlmethods:
-    oss:
-      accesskeyid: accesskeyid
-      accesskeysecret: accesskeysecret
-      region: regionname
-      bucket: bucketname
-      #endpoint: endpoint
-      #internal: false
-      #encrypt: false
-      #secure: true
-      #chunksize: 10M
-      #rootdirectory: rootdirectory
+  disableredirect: false
+  # Specify the type of storage: "filesystem", "azure", "gcs", "s3", "swift",
+  # "oss" and fill the information needed in the corresponding section. The type
+  # must be "filesystem" if you want to use persistent volumes for registry
+  # and chartmuseum
+  type: filesystem
+  filesystem:
+    rootdirectory: /storage
+    #maxthreads: 100
+  azure:
+    accountname: accountname
+    accountkey: base64encodedaccountkey
+    container: containername
+    #realm: core.windows.net
+  gcs:
+    bucket: bucketname
+    # The base64 encoded json file which contains the key
+    encodedkey: base64-encoded-json-key-file
+    #rootdirectory: /gcs/object/name/prefix
+    #chunksize: "5242880"
+  s3:
+    region: us-west-1
+    bucket: bucketname
+    #accesskey: awsaccesskey
+    #secretkey: awssecretkey
+    #regionendpoint: http://myobjects.local
+    #encrypt: false
+    #keyid: mykeyid
+    #secure: true
+    #v4auth: true
+    #chunksize: "5242880"
+    #rootdirectory: /s3/object/name/prefix
+    #storageclass: STANDARD
+  swift:
+    authurl: https://storage.myprovider.com/v3/auth
+    username: username
+    password: password
+    container: containername
+    #region: fr
+    #tenant: tenantname
+    #tenantid: tenantid
+    #domain: domainname
+    #domainid: domainid
+    #trustid: trustid
+    #insecureskipverify: false
+    #chunksize: 5M
+    #prefix:
+    #secretkey: secretkey
+    #accesskey: accesskey
+    #authversion: 3
+    #endpointtype: public
+    #tempurlcontainerkey: false
+    #tempurlmethods:
+  oss:
+    accesskeyid: accesskeyid
+    accesskeysecret: accesskeysecret
+    region: regionname
+    bucket: bucketname
+    #endpoint: endpoint
+    #internal: false
+    #encrypt: false
+    #secure: true
+    #chunksize: 10M
+    #rootdirectory: rootdirectory
 
 imagePullPolicy: IfNotPresent
 
@@ -225,16 +207,34 @@ harborAdminPassword: "Harbor12345"
 # The secret key used for encryption. Must be a string of 16 chars.
 secretKey: "not-a-secure-key"
 
-# If expose the service via "ingress", the Nginx will not be used
-nginx:
+# nginx proxy adapter for global registry
+proxy:
+  enabled: true
   image:
-    repository: goharbor/nginx-photon
-    tag: dev
-  replicas: 1
+    repository: library/nginx
+    tag: 1.14.2
+    pullPolicy: IfNotPresent
   # resources:
   #  requests:
   #    memory: 256Mi
   #    cpu: 100m
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+
+# If expose the service via "ingress", the Nginx will not be used
+nginx:
+  image:
+    repository: goharbor/nginx-photon
+    tag: v1.7.5
+  replicas: 1
+  resources:
+    requests:
+      cpu: 10m
+      memory: 100Mi
+    limits:
+      cpu: 100m
+      memory: 128Mi
   nodeSelector: {}
   tolerations: []
   affinity: {}
@@ -244,12 +244,33 @@ nginx:
 portal:
   image:
     repository: goharbor/harbor-portal
-    tag: dev
+    tag: v1.7.5
   replicas: 1
-# resources:
-#  requests:
-#    memory: 256Mi
-#    cpu: 100m
+  resources:
+    requests:
+      cpu: 10m
+      memory: 100Mi
+    limits:
+      cpu: 100m
+      memory: 128Mi
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+  ## Additional deployment annotations
+  podAnnotations: {}
+
+adminserver:
+  image:
+    repository: goharbor/harbor-adminserver
+    tag: v1.7.5
+  replicas: 1
+  resources:
+    requests:
+      cpu: 20m
+      memory: 100Mi
+    limits:
+      cpu: 100m
+      memory: 128Mi
   nodeSelector: {}
   tolerations: []
   affinity: {}
@@ -259,12 +280,15 @@ portal:
 core:
   image:
     repository: goharbor/harbor-core
-    tag: dev
+    tag: v1.7.5
   replicas: 1
-# resources:
-#  requests:
-#    memory: 256Mi
-#    cpu: 100m
+  resources:
+    requests:
+      cpu: 50m
+      memory: 100Mi
+    limits:
+      cpu: 100m
+      memory: 128Mi
   nodeSelector: {}
   tolerations: []
   affinity: {}
@@ -285,15 +309,18 @@ core:
 jobservice:
   image:
     repository: goharbor/harbor-jobservice
-    tag: dev
+    tag: v1.7.5
   replicas: 1
   maxJobWorkers: 10
   # The logger for jobs: "file", "database" or "stdout"
-  jobLogger: file
-# resources:
-#   requests:
-#     memory: 256Mi
-#     cpu: 100m
+  jobLogger: database
+  resources:
+    requests:
+      cpu: 20m
+      memory: 100Mi
+    limits:
+      cpu: 100m
+      memory: 128Mi
   nodeSelector: {}
   tolerations: []
   affinity: {}
@@ -308,19 +335,25 @@ registry:
   registry:
     image:
       repository: goharbor/registry-photon
-      tag: dev
-    # resources:
-    #  requests:
-    #    memory: 256Mi
-    #    cpu: 100m
+      tag: v2.6.2-v1.7.5 
+    resources:
+      requests:
+        cpu: 20m
+        memory: 100Mi
+      limits:
+        cpu: 100m
+        memory: 128Mi
   controller:
     image:
       repository: goharbor/harbor-registryctl
-      tag: dev
-    # resources:
-    #  requests:
-    #    memory: 256Mi
-    #    cpu: 100m
+      tag: v1.7.5
+    resources:
+      requests:
+        cpu: 20m
+        memory: 100Mi
+      limits:
+        cpu: 100m
+        memory: 128Mi
   replicas: 1
   nodeSelector: {}
   tolerations: []
@@ -338,12 +371,15 @@ chartmuseum:
   enabled: true
   image:
     repository: goharbor/chartmuseum-photon
-    tag: dev
+    tag: v0.8.1-v1.7.5
   replicas: 1
-  # resources:
-  #  requests:
-  #    memory: 256Mi
-  #    cpu: 100m
+  resources:
+    requests:
+      cpu: 20m
+      memory: 100Mi
+    limits:
+      cpu: 100m
+      memory: 128Mi
   nodeSelector: {}
   tolerations: []
   affinity: {}
@@ -354,7 +390,7 @@ clair:
   enabled: true
   image:
     repository: goharbor/clair-photon
-    tag: dev
+    tag: v2.0.8-v1.7.5
   replicas: 1
   # The http(s) proxy used to update vulnerabilities database from internet
   httpProxy:
@@ -362,10 +398,13 @@ clair:
   # The interval of clair updaters, the unit is hour, set to 0 to 
   # disable the updaters
   updatersInterval: 12
-  # resources:
-  #  requests:
-  #    memory: 256Mi
-  #    cpu: 100m
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 100m
+      memory: 256Mi
   nodeSelector: {}
   tolerations: []
   affinity: {}
@@ -377,21 +416,27 @@ notary:
   server:
     image:
       repository: goharbor/notary-server-photon
-      tag: dev
+      tag: v0.6.1-v1.7.5
     replicas: 1
-    # resources:
-    #  requests:
-    #    memory: 256Mi
-    #    cpu: 100m
+    resources:
+      requests:
+        cpu: 20m
+        memory: 100Mi
+      limits:
+        cpu: 100m
+        memory: 128Mi
   signer:
     image:
       repository: goharbor/notary-signer-photon
-      tag: dev
+      tag: v0.6.1-v1.7.5
     replicas: 1
-    # resources:
-    #  requests:
-    #    memory: 256Mi
-    #    cpu: 100m
+    resources:
+      requests:
+        cpu: 20m
+        memory: 100Mi
+      limits:
+        cpu: 100m
+        memory: 128Mi
   nodeSelector: {}
   tolerations: []
   affinity: {}
@@ -412,7 +457,7 @@ database:
   internal:
     image:
       repository: goharbor/harbor-db
-      tag: dev
+      tag: v1.7.5
     # The initial superuser password for internal database
     password: "changeit"
     # resources:
@@ -442,7 +487,7 @@ redis:
   internal:
     image:
       repository: goharbor/redis-photon
-      tag: dev
+      tag: v1.7.5
     # resources:
     #  requests:
     #    memory: 256Mi
@@ -462,3 +507,7 @@ redis:
     password: ""
   ## Additional deployment annotations
   podAnnotations: {}
+
+cert:
+  # enable cert daemonSet to distribute harbor CA certs to the /etc/docker/certs.d/MY_DOMAIN:PORT/ path
+  enabled: false

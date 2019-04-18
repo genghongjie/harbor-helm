@@ -12,7 +12,7 @@ data:
       fields:
         service: registry
     storage:
-      {{- $storage := .Values.persistence.imageChartStorage }}
+      {{- $storage := .Values.imageChartStorage }}
       {{- $type := $storage.type }}
       {{- if eq $type "filesystem" }}
       filesystem:
@@ -152,7 +152,11 @@ data:
     auth:
       token:
         issuer: harbor-token-issuer
-        realm: "{{ .Values.externalURL }}/service/token"
+        {{- if eq .Values.expose.tls.type "rancher" }}
+        realm: "{{ template "harbor.externalURL" . }}/registry/service/token"
+        {{- else }}
+        realm: "{{ template "harbor.externalURL" . }}/service/token"
+        {{- end }}
         rootcertbundle: /etc/registry/root.crt
         service: harbor-registry
     validation:

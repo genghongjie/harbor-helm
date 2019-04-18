@@ -43,7 +43,11 @@ data:
       "auth": {
           "type": "token",
           "options": {
-              "realm": "{{ .Values.externalURL }}/service/token",
+              {{- if eq .Values.expose.tls.type "rancher" }}
+              "realm": "{{ template "harbor.externalURL" . }}/registry/service/token",
+              {{- else }}
+              "realm": "{{ template "harbor.externalURL" . }}/service/token",
+              {{- end }}
               "service": "harbor-notary",
               "issuer": "harbor-token-issuer",
               "rootcertbundle": "/root.crt"

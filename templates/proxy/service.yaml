@@ -1,16 +1,14 @@
+{{ if and .Values.proxy.enabled (eq .Values.expose.tls.type "rancher") }}
 apiVersion: v1
 kind: Service
 metadata:
-  name: "{{ template "harbor.portal" . }}"
+  name: "{{ template "harbor.proxy" . }}"
   labels:
 {{ include "harbor.labels" . | indent 4 }}
 spec:
-{{- if (eq .Values.expose.ingress.controller "gce") }}
-  type: NodePort
-{{- end }}
   ports:
     - port: 80
-      targetPort: 80
   selector:
 {{ include "harbor.matchLabels" . | indent 4 }}
-    component: portal
+    component: proxy
+{{ end }}

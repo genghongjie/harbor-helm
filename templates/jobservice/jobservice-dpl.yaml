@@ -55,8 +55,8 @@ spec:
               secretKeyRef:
                 name: "{{ template "harbor.jobservice" . }}"
                 key: secret
-          - name: CORE_URL
-            value: "http://{{ template "harbor.core" . }}"
+          - name: ADMINSERVER_URL
+            value: "http://{{ template "harbor.adminserver" . }}"
           - name: REGISTRY_CONTROLLER_URL
             value: "http://{{ template "harbor.registry" . }}:8080"
           - name: LOG_LEVEL
@@ -75,9 +75,12 @@ spec:
         configMap:
           name: "{{ template "harbor.jobservice" . }}"
       - name: job-logs
-        {{- if and .Values.persistence.enabled (eq .Values.jobservice.jobLogger "file") }}
+        {{- if and (eq .Values.persistence.type "storageClass") (eq .Values.jobservice.jobLogger "file") }}
         persistentVolumeClaim:
-          claimName: {{ .Values.persistence.persistentVolumeClaim.jobservice.existingClaim | default (include "harbor.jobservice" .) }}  
+          claimName: {{ .Values.persistence.persistentVolumeClaim.jobservice.existingClaim | default (include "harbor.jobservice" .) }}
+        {{- else if and (eq .Values.persistence.type "hostPath") (eq .Values.jobservice.jobLogger "file") }}
+        hostPath:
+          path: {{ .Values.persistence.hostPath }}/jobservice
         {{- else }}
         emptyDir: {}
         {{- end }}

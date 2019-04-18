@@ -31,10 +31,12 @@ app: "{{ template "harbor.name" . }}"
 {{- end -}}
 
 {{- define "harbor.autoGenCert" -}}
-  {{- if and .Values.expose.tls.enabled (not .Values.expose.tls.secretName) -}}
-    {{- printf "true" -}}
-  {{- else -}}
+  {{- if eq .Values.expose.tls.type "secretName" -}}
     {{- printf "false" -}}
+  {{- else if eq .Values.expose.tls.type "rancher" -}}
+    {{- printf "false" -}}
+  {{- else -}}
+    {{- printf "true" -}}
   {{- end -}}
 {{- end -}}
 
@@ -234,6 +236,10 @@ host:port,pool_size,password
   {{- printf "%s-redis" (include "harbor.fullname" .) -}}
 {{- end -}}
 
+{{- define "harbor.adminserver" -}}
+  {{- printf "%s-adminserver" (include "harbor.fullname" .) -}}
+{{- end -}}
+
 {{- define "harbor.jobservice" -}}
   {{- printf "%s-jobservice" (include "harbor.fullname" .) -}}
 {{- end -}}
@@ -262,10 +268,45 @@ host:port,pool_size,password
   {{- printf "%s-notary-signer" (include "harbor.fullname" .) -}}
 {{- end -}}
 
+{{- define "harbor.proxy" -}}
+  {{- printf "%s-proxy" (include "harbor.fullname" .) -}}
+{{- end -}}
+
 {{- define "harbor.nginx" -}}
   {{- printf "%s-nginx" (include "harbor.fullname" .) -}}
 {{- end -}}
 
-{{- define "harbor.ingress" -}}
-  {{- printf "%s-ingress" (include "harbor.fullname" .) -}}
+{{- define "harbor.ingress.core" -}}
+  {{- printf "%s-ingress-core" (include "harbor.fullname" .) -}}
+{{- end -}}
+
+{{- define "harbor.ingress.notary" -}}
+  {{- printf "%s-ingress-notary" (include "harbor.fullname" .) -}}
+{{- end -}}
+
+{{- define "harbor.cert" -}}
+  {{- printf "%s-cert" (include "harbor.fullname" .) -}}
+{{- end -}}
+
+{{- define "harbor.externalURL" -}}
+    {{- if eq .Values.expose.type "ingress" }}
+      {{- printf "https://%s" .Values.expose.ingress.host -}}
+    {{- else if eq .Values.expose.type "clusterIP" }}
+      {{- printf "https://%s" .Values.expose.clusterIP.name -}}
+    {{- else }}
+      {{- .Values.externalURL -}}
+    {{- end }}
+{{- end -}}
+
+{{- define "harbor.certPath" -}}
+  {{- (include "harbor.externalURL" .) | trimPrefix "https://"  | trimPrefix "http://" -}}
+{{- end -}}
+
+{{/*
+The commmon name used to generate the certificate, it's necessary,
+when the type isn't "ingress" and TLS type is "self-signed x509 certificate"
+*/}}
+{{- define "harbor.tlsCommonName" -}}
+  {{- $trimURL := (include "harbor.externalURL" .)  | trimPrefix "https://"  | trimPrefix "http://" -}}
+  {{ regexReplaceAll ":.*$" $trimURL "${1}" }}
 {{- end -}}
