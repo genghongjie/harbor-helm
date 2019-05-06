@@ -293,6 +293,8 @@ host:port,pool_size,password
       {{- printf "https://%s" .Values.expose.ingress.host -}}
     {{- else if eq .Values.expose.type "clusterIP" }}
       {{- printf "https://%s" .Values.expose.clusterIP.name -}}
+    {{- else if eq .Values.expose.type "nodePort" }}
+      {{- printf "%s:%s" .Values.externalURL (.Values.expose.nodePort.ports.https.nodePort | toString) -}}
     {{- else }}
       {{- .Values.externalURL -}}
     {{- end }}

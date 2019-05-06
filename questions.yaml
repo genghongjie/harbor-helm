@@ -145,6 +145,7 @@ questions:
   type: password
   label: The Initial Password of Harbor Admin
   group: "Global Options"
+  valid_chars: "a-zA-Z0-9"
 - variable: secretKey
   required: true
   default: "add-your-secret0"
@@ -154,6 +155,7 @@ questions:
   min_length: 16
   max_length: 16
   group: "Global Options"
+  valid_chars: "a-zA-Z0-9\u002D"
 - variable: logLevel
   required: true
   default: "info"
@@ -188,11 +190,22 @@ questions:
   show_if: "expose.type=ingress"
 - variable: externalURL
   required: true
-  default: "https://harbor.local:30003"
+  default: "https://harbor.local"
   description: "Use k8s node IP if the service type is NodePort or proxy URL if the Harbor is deployed behind the proxy (format: protocol://domain:port)"
   type: string
   label: The External URL for Harbor Core Service
   group: "Expose Service Options"
+  show_if: "expose.type!=ingress"
+- variable: expose.nodePort.ports.https.nodePort
+  required: true
+  default: 30003
+  description: "NodePort of Harbor https port (to set explicitly, choose port between 30000-32767)"
+  type: int
+  min: 30000
+  max: 32767
+  label: NodePort of Harbor Https Port
+  group: "Expose Service Options"
+  show_if: "expose.type=nodePort"
 - variable: expose.tls.type
   required: true
   default: "secretName"
