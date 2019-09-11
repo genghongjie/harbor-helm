@@ -272,10 +272,43 @@ host:port,pool_size,password
   {{- printf "%s-notary-signer" (include "harbor.fullname" .) -}}
 {{- end -}}
 
+{{- define "harbor.proxy" -}}
+  {{- printf "%s-proxy" (include "harbor.fullname" .) -}}
+{{- end -}}
+
 {{- define "harbor.nginx" -}}
   {{- printf "%s-nginx" (include "harbor.fullname" .) -}}
 {{- end -}}
 
 {{- define "harbor.ingress" -}}
   {{- printf "%s-ingress" (include "harbor.fullname" .) -}}
+{{- end -}}
+
+{{- define "harbor.cert" -}}
+  {{- printf "%s-cert" (include "harbor.fullname" .) -}}
+{{- end -}}
+
+{{- define "harbor.externalURL" -}}
+    {{- if eq .Values.expose.type "ingress" }}
+      {{- printf "https://%s" .Values.expose.ingress.hosts.core -}}
+    {{- else if eq .Values.expose.type "clusterIP" }}
+      {{- printf "https://%s" .Values.expose.clusterIP.name -}}
+    {{- else if eq .Values.expose.type "loadBalancer" }}
+      {{- printf "%s" .Values.expose.loadBalancer.IP -}}
+    {{- else }}
+      {{- .Values.externalURL -}}
+    {{- end }}
+{{- end -}}
+
+{{- define "harbor.certPath" -}}
+  {{- (include "harbor.externalURL" .) | trimPrefix "https://"  | trimPrefix "http://" -}}
+{{- end -}}
+
+{{/*
+The commmon name used to generate the certificate, it's necessary,
+when the type isn't "ingress" and TLS type is "self-signed x509 certificate"
+*/}}
+{{- define "harbor.tlsCommonName" -}}
+  {{- $trimURL := (include "harbor.externalURL" .)  | trimPrefix "https://"  | trimPrefix "http://" -}}
+  {{ regexReplaceAll ":.*$" $trimURL "${1}" }}
 {{- end -}}
