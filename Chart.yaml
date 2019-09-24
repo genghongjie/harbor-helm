@@ -12,7 +12,7 @@ sources:
 - https://github.com/goharbor/harbor
 - https://github.com/goharbor/harbor-helm
 maintainers:
-- name: Jesse Hu
+- name: jessehu
   email: huh@vmware.com
 - name: paulczar
   email: username.taken@gmail.com
