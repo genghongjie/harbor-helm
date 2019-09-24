@@ -529,3 +529,6 @@ redis:
     password: ""
   ## Additional deployment annotations
   podAnnotations: {}
+
+cert:
+  enabled: true

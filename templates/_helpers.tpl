@@ -303,3 +303,11 @@ The commmon name used to generate the certificate, it's necessary when the type 
   {{- $trimURL := (include "harbor.externalURL" .)  | trimPrefix "https://"  | trimPrefix "http://" -}}
   {{ regexReplaceAll ":.*$" $trimURL "${1}" }}
 {{- end -}}
+
+{{- define "harbor.cert" -}}
+  {{- printf "%s-cert" (include "harbor.fullname" .) -}}
+{{- end -}}
+
+{{- define "harbor.certPath" -}}
+  {{- (include "harbor.externalURL" .) | trimPrefix "https://"  | trimPrefix "http://" -}}
+{{- end -}}
